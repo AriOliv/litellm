@@ -54,11 +54,15 @@ from litellm.types.utils import (
     CompletionTokensDetailsWrapper,
 )
 from litellm.types.utils import Message as LitellmMessage
-from litellm.types.utils import PromptTokensDetailsWrapper, ServerToolUse
+from litellm.types.utils import (
+    PromptTokensDetailsWrapper,
+    ServerToolUse,
+)
 from litellm.utils import (
     ModelResponse,
     Usage,
     add_dummy_tool,
+    any_assistant_message_has_thinking_blocks,
     get_max_tokens,
     has_tool_call_blocks,
     last_assistant_with_tool_calls_has_no_thinking_blocks,
@@ -204,9 +208,11 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
         )  # Relevant issue: https://github.com/BerriAI/litellm/issues/7755
 
     def get_cache_control_headers(self) -> dict:
+        # Anthropic no longer requires the prompt-caching beta header
+        # Prompt caching now works automatically when cache_control is used in messages
+        # Reference: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
         return {
             "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
         }
 
     def _map_tool_choice(
@@ -942,6 +948,12 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
         self, headers: dict, optional_params: dict
     ) -> dict:
         """Update headers with optional anthropic beta."""
+        
+        # Skip adding beta headers for Vertex requests
+        # Vertex AI handles these headers differently
+        is_vertex_request = optional_params.get("is_vertex_request", False)
+        if is_vertex_request:
+            return headers
 
         _tools = optional_params.get("tools", [])
         for tool in _tools:
@@ -1002,10 +1014,16 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
 
         # Drop thinking param if thinking is enabled but thinking_blocks are missing
         # This prevents the error: "Expected thinking or redacted_thinking, but found tool_use"
+        #
+        # IMPORTANT: Only drop thinking if NO assistant messages have thinking_blocks.
+        # If any message has thinking_blocks, we must keep thinking enabled, otherwise
+        # Anthropic errors with: "When thinking is disabled, an assistant message cannot contain thinking"
+        # Related issue: https://github.com/BerriAI/litellm/issues/18926
         if (
             optional_params.get("thinking") is not None
             and messages is not None
             and last_assistant_with_tool_calls_has_no_thinking_blocks(messages)
+            and not any_assistant_message_has_thinking_blocks(messages)
         ):
             if litellm.modify_params:
                 optional_params.pop("thinking", None)
@@ -1028,7 +1046,7 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
             anthropic_messages = anthropic_messages_pt(
                 model=model,
                 messages=messages,
-                llm_provider="anthropic",
+                llm_provider=self.custom_llm_provider or "anthropic",
             )
         except Exception as e:
             raise AnthropicError(
@@ -1066,6 +1084,9 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
             and _valid_user_id(_litellm_metadata["user_id"])
         ):
             optional_params["metadata"] = {"user_id": _litellm_metadata["user_id"]}
+
+        # Remove internal LiteLLM parameters that should not be sent to Anthropic API
+        optional_params.pop("is_vertex_request", None)
 
         data = {
             "model": model,
@@ -1117,6 +1138,7 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
         Optional[str],
         List[ChatCompletionToolCallChunk],
         Optional[List[Any]],
+        Optional[List[Any]],
     ]:
         text_content = ""
         citations: Optional[List[Any]] = None
@@ -1128,36 +1150,38 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
         reasoning_content: Optional[str] = None
         tool_calls: List[ChatCompletionToolCallChunk] = []
         web_search_results: Optional[List[Any]] = None
+        tool_results: Optional[List[Any]] = None
         for idx, content in enumerate(completion_response["content"]):
             if content["type"] == "text":
                 text_content += content["text"]
             ## TOOL CALLING
-            elif content["type"] == "tool_use":
+            elif content["type"] == "tool_use" or content["type"] == "server_tool_use":
                 tool_call = AnthropicConfig.convert_tool_use_to_openai_format(
                     anthropic_tool_content=content,
                     index=idx,
                 )
                 tool_calls.append(tool_call)
-            ## SERVER TOOL USE (for tool search)
-            elif content["type"] == "server_tool_use":
-                # Server tool use blocks are for tool search - treat as tool calls
-                # Note: using .get("input", {}) for server_tool_use as input may not be present
-                content_with_input = {**content, "input": content.get("input", {})}
-                tool_call = AnthropicConfig.convert_tool_use_to_openai_format(
-                    anthropic_tool_content=content_with_input,
-                    index=idx,
-                )
-                tool_calls.append(tool_call)
-            ## TOOL SEARCH TOOL RESULT (skip - this is metadata about tool discovery)
-            elif content["type"] == "tool_search_tool_result":
-                # This block contains tool_references that were discovered
-                # We don't need to include this in the response as it's internal metadata
-                pass
-            ## WEB SEARCH TOOL RESULT - preserve web search results for multi-turn conversations
-            elif content["type"] == "web_search_tool_result":
-                if web_search_results is None:
-                    web_search_results = []
-                web_search_results.append(content)
+
+            ## TOOL RESULTS - handle all tool result types (code execution, etc.)
+            elif content["type"].endswith("_tool_result"):
+                # Skip tool_search_tool_result as it's internal metadata
+                if content["type"] == "tool_search_tool_result":
+                    continue
+                # Handle web_search_tool_result separately for backwards compatibility
+                if content["type"] == "web_search_tool_result":
+                    if web_search_results is None:
+                        web_search_results = []
+                    web_search_results.append(content)
+                elif content["type"] == "web_fetch_tool_result":
+                    if web_search_results is None:
+                        web_search_results = []
+                    web_search_results.append(content)  
+                else:
+                    # All other tool results (bash_code_execution_tool_result, text_editor_code_execution_tool_result, etc.)
+                    if tool_results is None:
+                        tool_results = []
+                    tool_results.append(content)
+
             elif content.get("thinking", None) is not None:
                 if thinking_blocks is None:
                     thinking_blocks = []
@@ -1189,7 +1213,7 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
                 if thinking_content is not None:
                     reasoning_content += thinking_content
 
-        return text_content, citations, thinking_blocks, reasoning_content, tool_calls, web_search_results
+        return text_content, citations, thinking_blocks, reasoning_content, tool_calls, web_search_results, tool_results
 
     def calculate_usage(
         self,
@@ -1261,14 +1285,15 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
             cache_creation_tokens=cache_creation_input_tokens,
             cache_creation_token_details=cache_creation_token_details,
         )
-        completion_token_details = (
-            CompletionTokensDetailsWrapper(
-                reasoning_tokens=token_counter(
-                    text=reasoning_content, count_response_tokens=True
-                )
-            )
+        # Always populate completion_token_details, not just when there's reasoning_content
+        reasoning_tokens = (
+            token_counter(text=reasoning_content, count_response_tokens=True)
             if reasoning_content
-            else None
+            else 0
+        )
+        completion_token_details = CompletionTokensDetailsWrapper(
+            reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
+            text_tokens=completion_tokens - reasoning_tokens if reasoning_tokens > 0 else completion_tokens,
         )
         total_tokens = prompt_tokens + completion_tokens
 
@@ -1330,6 +1355,7 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
                 reasoning_content,
                 tool_calls,
                 web_search_results,
+                tool_results,
             ) = self.extract_response_content(completion_response=completion_response)
 
             if (
@@ -1343,6 +1369,8 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
                 "context_management"
             )
 
+            container: Optional[Dict] = completion_response.get("container")
+
             provider_specific_fields: Dict[str, Any] = {
                 "citations": citations,
                 "thinking_blocks": thinking_blocks,
@@ -1351,7 +1379,11 @@ class AnthropicConfig(AnthropicModelInfo, BaseConfig):
                 provider_specific_fields["context_management"] = context_management
             if web_search_results is not None:
                 provider_specific_fields["web_search_results"] = web_search_results
-
+            if tool_results is not None:
+                provider_specific_fields["tool_results"] = tool_results
+            if container is not None:
+                provider_specific_fields["container"] = container
+                
             _message = litellm.Message(
                 tool_calls=tool_calls,
                 content=text_content or None,
