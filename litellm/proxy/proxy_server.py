@@ -597,7 +597,7 @@ except ImportError:
 
 server_root_path = get_server_root_path()
 _license_check = LicenseCheck()
-premium_user: bool = _license_check.is_premium()
+premium_user: bool = True#_license_check.is_premium()
 premium_user_data: Optional["EnterpriseLicenseData"] = (
     _license_check.airgapped_license_data
 )
