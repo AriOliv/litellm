@@ -18,7 +18,7 @@ services:
       # single-DB deployments. With IAM_TOKEN_DB_AUTH enabled, the reader URL
       # is auto-refreshed alongside the writer.
       # DATABASE_URL_READ_REPLICA: "postgresql://llmproxy:dbpassword9090@db-reader:5432/litellm"
-      STORE_MODEL_IN_DB: "True" # allows adding models to proxy via UI
+      # STORE_MODEL_IN_DB controlled via config.yaml general_settings.store_model_in_db
     env_file:
       - .env # Load local .env file
     depends_on:
