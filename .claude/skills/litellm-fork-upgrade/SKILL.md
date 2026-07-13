@@ -69,4 +69,8 @@ keep or drop by the same principle (backend/deploy = keep, UI = drop), because t
   image never overwrites it
 - The image build is a cross-platform build (amd64 from an arm workstation); the Python stage runs
   under emulation and is slow. The UI stage builds natively. Expect a long build
+- Config schema tightens across versions and an invalid `config.yaml` crashes proxy startup (a hard
+  outage). Dry-run the new image against the live `config.yaml` in a throwaway container (dummy DB)
+  before restarting prod. Known case: 1.93.0 required `oauth2_flow` on `auth_type: oauth2` MCP servers.
+  See references/runbook.md "Config compatibility across versions"
 - Keep secrets out of everything you write or print
