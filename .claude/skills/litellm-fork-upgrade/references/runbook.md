@@ -122,6 +122,22 @@ gcloud compute ssh $VM --zone=$ZONE --command="docker tag $IMAGE:rollback $IMAGE
 Then investigate the failure before retrying. The upstream jump can be hundreds of commits, so a
 regression is plausible; the rollback tag makes reverting a single command.
 
+## Config compatibility across versions (validate before restarting prod)
+
+An upstream jump can tighten `config.yaml` validation, and the proxy refuses to start on an invalid
+config, which is a hard outage if you find out by restarting prod. Before step 7, dry-run the new
+image against the live `config.yaml` in a throwaway container (dummy DB so it never touches prod):
+
+```bash
+gcloud compute ssh $VM --zone=$ZONE --command='docker run -d --name litellm-canary -v ~/config.yaml:/app/config.yaml:ro --env-file ~/.env -e DATABASE_URL="postgresql://none:none@127.0.0.1:1/none" '$IMAGE':v<ver> --config /app/config.yaml; sleep 25; docker inspect litellm-canary --format "running={{.State.Running}} exit={{.State.ExitCode}}"; docker logs litellm-canary 2>&1 | grep -iE "Invalid config|ValueError|startup failed" | tail; docker rm -f litellm-canary'
+```
+
+`running=true` (vs `exit!=0`) means it passed config validation; a crash prints the exact key to fix.
+Known example: 1.93.0 made `oauth2_flow` required on any `mcp_servers` entry with `auth_type: oauth2`
+(values `client_credentials` or `authorization_code`); the 1.92 to 1.93 upgrade crashed on startup
+until `config.yaml`'s `avenia` MCP server got `oauth2_flow: authorization_code` (per-user browser OAuth).
+Fix `config.yaml` on the VM, re-run the canary, then deploy.
+
 ## Notes
 
 - `config.yaml` on the VM (models, aliases, MCP servers) is never touched by the image; it is the
