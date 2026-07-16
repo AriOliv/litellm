@@ -40,6 +40,8 @@ upgrade these are:
 - `docker-compose.yml` using a mounted `config.yaml` (`--config=/app/config.yaml`) with
   `STORE_MODEL_IN_DB` driven by `general_settings.store_model_in_db` in that file, not an env var
 - the `.gitignore` negation that tracks `.claude/skills/`, plus this skill itself
+- `.github/workflows/deploy-gateway.yml`: the CD pipeline (push to main -> build image -> manual
+  approval -> deploy to the VM). Fork-only, not upstream; re-apply it on rebase like the others
 
 Drop (take upstream's version): any UI / dashboard-layout customization. Upstream reworks the
 admin UI frequently and our tweaks conflict every time, so let upstream win on `ui/**`. If a
@@ -48,13 +50,28 @@ past UI commit shows up in `git log origin/main..main`, do not cherry-pick it.
 Before each upgrade, re-read the actual `git log origin/main..main` and classify each commit as
 keep or drop by the same principle (backend/deploy = keep, UI = drop), because the set can change.
 
+## Deploy model: CI-first, manual as fallback
+
+Deploy is automated by `.github/workflows/deploy-gateway.yml`. A push to the fork's `main` that
+touches the image (paths: `litellm/**`, `ui/**`, `Dockerfile`, `pyproject.toml`, `uv.lock`,
+`docker/**`) builds an immutable image on GitHub's amd64 runners (native, faster than the local
+emulated build) and then waits for manual approval in the `production` GitHub Environment before
+rolling out to the VM (canary -> snapshot rollback tag -> deploy -> health -> auto-rollback on
+failure). Auth to GCP is keyless (Workload Identity Federation); SSH to the VM is tunnelled
+through IAP; the workflow carries no internal topology (it reads project/VM/zone/image/provider
+from repo variables).
+
+So the normal upgrade is: do the rebase (steps 1-5) locally; the force-push in step 5 triggers
+the pipeline, and you approve the deploy in the Actions run. Steps 6-9 below are exactly what the
+pipeline automates and remain the manual fallback if you ever need to deploy by hand.
+
 ## Procedure (summary; full commands in references/runbook.md)
 
 1. Assess: `git fetch origin`, compare version (`pyproject.toml`) and count (`git rev-list --count main..origin/main`)
 2. Back up the current fork state to a branch, then `git reset --hard origin/main`
 3. Cherry-pick the keep-commits in chronological order; resolve conflicts (the `premium_user` line is the usual one). Do not re-apply UI commits
 4. `make pre-commit` (per repo CLAUDE.md) and fix anything it flags
-5. Force-push the rebased `main` to the fork
+5. Force-push the rebased `main` to the fork (this triggers `deploy-gateway.yml`: build, then the approval-gated deploy). Steps 6-9 are what that pipeline runs; do them by hand only when deploying without CI
 6. Build the image for `linux/amd64` with buildx and push to the registry, tagging both `:custom` and a versioned tag
 7. Deploy on the VM: free disk if needed, snapshot a rollback tag, pull, restart, verify
 8. Verify: `/health/liveliness`, a real model completion, and that Chat + the MCP connector still work
@@ -68,7 +85,8 @@ keep or drop by the same principle (backend/deploy = keep, UI = drop), because t
 - `config.yaml` (models, aliases, MCP) lives mounted on the VM, not baked into the image, so a new
   image never overwrites it
 - The image build is a cross-platform build (amd64 from an arm workstation); the Python stage runs
-  under emulation and is slow. The UI stage builds natively. Expect a long build
+  under emulation and is slow. The UI stage builds natively. Expect a long build. This only applies
+  to a manual local build; the CI pipeline builds on amd64 runners natively (fast)
 - Config schema tightens across versions and an invalid `config.yaml` crashes proxy startup (a hard
   outage). Dry-run the new image against the live `config.yaml` in a throwaway container (dummy DB)
   before restarting prod. Known case: 1.93.0 required `oauth2_flow` on `auth_type: oauth2` MCP servers.

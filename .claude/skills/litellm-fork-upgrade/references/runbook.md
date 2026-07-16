@@ -4,6 +4,13 @@ Exact procedure to rebase this fork onto upstream `BerriAI/litellm` and ship a n
 image. Commands assume you run them from the repo root on the operator workstation, with
 `gcloud` authenticated and Docker running.
 
+> Deploy is normally automated. `.github/workflows/deploy-gateway.yml` builds the image on a
+> push to `main` (image-affecting paths) and, after manual approval in the `production` GitHub
+> Environment, runs the build+deploy over IAP SSH (keyless via WIF). The rebase (sections 1-5)
+> is still done here on the workstation; the force-push in section 5 triggers the pipeline, which
+> automates sections 6-9. The commands in sections 6-9 remain the manual fallback and the
+> source-of-truth for what the workflow does (canary, rollback tag, health check are the same).
+
 ## 0. Deployment variables
 
 These are intentionally not committed with real values (public repo). Set them from the

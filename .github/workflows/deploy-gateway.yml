@@ -1,0 +1,195 @@
+name: Deploy gateway
+
+# Continuous deploy of this fork to the gateway VM, driven by updates to main.
+# A push to main that touches the image build (or a manual dispatch) builds and
+# pushes an immutable image; the actual production rollout waits on manual
+# approval (the `production` environment) and then runs canary + deploy +
+# health-check + rollback over an IAP-tunnelled SSH session. Auth to GCP is
+# keyless (Workload Identity Federation); no long-lived secret is stored.
+# Deployment specifics (project, VM, zone, image, WIF provider) live in repo
+# variables so this public workflow carries no internal topology.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "litellm/**"
+      - "ui/**"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "docker/**"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-gateway
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Compute image metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          version="$(grep -m1 -E '^version' pyproject.toml | sed -E 's/.*= *"([^"]+)".*/\1/')"
+          if [ -z "${version}" ]; then echo "could not read version from pyproject.toml" >&2; exit 1; fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to GCP (WIF, keyless)
+        id: auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      - name: Log in to the container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: gcr.io
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and push immutable tags (never :custom)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ${{ vars.GCR_IMAGE }}:git-${{ github.sha }}
+            ${{ vars.GCR_IMAGE }}:v${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to gateway VM
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Authenticate to GCP (WIF, keyless)
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Write remote deploy script
+        run: |
+          cat > deploy.sh <<'REMOTE'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          IMAGE="$1"; NEWTAG="$2"
+          NEW="${IMAGE}:${NEWTAG}"
+          cd /home/arioliveira
+
+          echo "::group::pull new image"
+          sudo docker pull "$NEW"
+          echo "::endgroup::"
+
+          echo "::group::canary (validate config against new image, dummy DB)"
+          sudo docker rm -f litellm-canary >/dev/null 2>&1 || true
+          sudo docker run -d --name litellm-canary \
+            -v /home/arioliveira/config.yaml:/app/config.yaml:ro \
+            --env-file /home/arioliveira/.env \
+            -e DATABASE_URL="postgresql://none:none@127.0.0.1:1/none" \
+            "$NEW" --config /app/config.yaml >/dev/null
+          sleep 25
+          running="$(sudo docker inspect litellm-canary --format '{{.State.Running}}' 2>/dev/null || echo false)"
+          exitcode="$(sudo docker inspect litellm-canary --format '{{.State.ExitCode}}' 2>/dev/null || echo 1)"
+          sudo docker logs litellm-canary 2>&1 | grep -iE "Invalid config|ValueError|startup failed|oauth2_flow|Traceback" | tail -n 20 || true
+          sudo docker rm -f litellm-canary >/dev/null 2>&1 || true
+          if [ "$running" != "true" ]; then
+            echo "CANARY FAILED (running=$running exit=$exitcode): new image rejects the live config; production untouched"
+            exit 1
+          fi
+          echo "canary ok"
+          echo "::endgroup::"
+
+          echo "::group::snapshot rollback + promote :custom"
+          if sudo docker image inspect "${IMAGE}:custom" >/dev/null 2>&1; then
+            sudo docker tag "${IMAGE}:custom" "${IMAGE}:rollback"
+            echo "rollback snapshot taken from current :custom"
+          else
+            echo "no current :custom locally (first deploy); skipping rollback snapshot"
+          fi
+          sudo docker tag "$NEW" "${IMAGE}:custom"
+          echo "::endgroup::"
+
+          echo "::group::deploy"
+          sudo docker compose up -d litellm
+          echo "::endgroup::"
+
+          echo "::group::health check"
+          ok=0
+          for i in $(seq 1 24); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4000/health/liveliness || echo 000)"
+            if [ "$code" = "200" ]; then ok=1; echo "health 200 after ${i} attempt(s)"; break; fi
+            sleep 5
+          done
+          if [ "$ok" != "1" ]; then
+            echo "HEALTH FAILED: rolling back"
+            if sudo docker image inspect "${IMAGE}:rollback" >/dev/null 2>&1; then
+              sudo docker tag "${IMAGE}:rollback" "${IMAGE}:custom"
+              sudo docker compose up -d litellm
+              echo "rolled back to previous image"
+            fi
+            exit 1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::real completion (cheap model; key never printed)"
+          key="$(sudo sed -n 's/^LITELLM_MASTER_KEY=//p' /home/arioliveira/.env | head -n1)"
+          key="${key%\"}"; key="${key#\"}"; key="${key%\'}"; key="${key#\'}"
+          resp="$(curl -s -m 30 -H "Authorization: Bearer ${key}" -H "Content-Type: application/json" \
+            http://localhost:4000/v1/chat/completions \
+            -d '{"model":"claude-haiku-4-5","messages":[{"role":"user","content":"say ok"}],"max_tokens":10}')"
+          if printf '%s' "$resp" | grep -q '"content"'; then
+            echo "REAL_COMPLETION_OK"
+          else
+            echo "completion did not return content: ${resp:0:200}"
+            exit 1
+          fi
+          echo "::endgroup::"
+          REMOTE
+          chmod +x deploy.sh
+
+      - name: Copy deploy script to VM (IAP)
+        run: |
+          gcloud compute scp deploy.sh "${{ vars.GCP_VM }}:/tmp/litellm-deploy.sh" \
+            --zone="${{ vars.GCP_ZONE }}" --tunnel-through-iap --quiet
+
+      - name: Run deploy on VM (IAP)
+        run: |
+          gcloud compute ssh "${{ vars.GCP_VM }}" --zone="${{ vars.GCP_ZONE }}" \
+            --tunnel-through-iap --quiet \
+            --command="bash /tmp/litellm-deploy.sh '${{ vars.GCR_IMAGE }}' 'git-${{ github.sha }}'"
+
+      - name: Promote :custom on the registry
+        run: |
+          gcloud container images add-tag \
+            "${{ vars.GCR_IMAGE }}:git-${{ github.sha }}" \
+            "${{ vars.GCR_IMAGE }}:custom" --quiet
