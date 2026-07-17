@@ -104,7 +104,6 @@ jobs:
           set -euo pipefail
           IMAGE="$1"; NEWTAG="$2"
           NEW="${IMAGE}:${NEWTAG}"
-          cd /home/arioliveira
 
           echo "::group::pull new image"
           sudo docker pull "$NEW"
@@ -140,7 +139,7 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::deploy"
-          sudo docker compose up -d litellm
+          sudo bash -c 'cd /home/arioliveira && docker compose up -d litellm'
           echo "::endgroup::"
 
           echo "::group::health check"
@@ -154,7 +153,7 @@ jobs:
             echo "HEALTH FAILED: rolling back"
             if sudo docker image inspect "${IMAGE}:rollback" >/dev/null 2>&1; then
               sudo docker tag "${IMAGE}:rollback" "${IMAGE}:custom"
-              sudo docker compose up -d litellm
+              sudo bash -c 'cd /home/arioliveira && docker compose up -d litellm'
               echo "rolled back to previous image"
             fi
             exit 1
