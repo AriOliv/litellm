@@ -105,6 +105,16 @@ jobs:
           IMAGE="$1"; NEWTAG="$2"
           NEW="${IMAGE}:${NEWTAG}"
 
+          echo "::group::authenticate docker to the registry (instance SA)"
+          # sudo docker uses root's docker config, which has no persistent gcr
+          # credential; fetch a fresh token from the instance SA (metadata) and
+          # log in, so the pull below authenticates without relying on a helper.
+          TOKEN="$(curl -s -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')"
+          if [ -z "$TOKEN" ]; then echo "could not get instance SA token from metadata"; exit 1; fi
+          printf '%s' "$TOKEN" | sudo docker login -u oauth2accesstoken --password-stdin https://gcr.io >/dev/null
+          echo "docker authenticated to gcr.io via instance SA"
+          echo "::endgroup::"
+
           echo "::group::pull new image"
           sudo docker pull "$NEW"
           echo "::endgroup::"
