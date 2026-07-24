@@ -1,0 +1,97 @@
+name: AI security review
+
+# Cross-model, advisory AI security review of pull requests, backed by the LiteLLM
+# gateway. A proposer model surfaces vulnerabilities and a different-vendor verifier
+# adversarially refutes them; only findings that survive both are reported as a PR
+# comment (idempotent) plus SARIF in the Security tab. It complements the repo's
+# deterministic scanners (CodeQL, Semgrep, OSV-Scanner, Grype, Scorecard, Zizmor,
+# GitGuardian); it never blocks a merge.
+#
+# DRY-RUN BY DEFAULT: the PR comment is only posted when the repo variable
+# SECREVIEW_ENABLED == 'true'. Until then the review still runs (SARIF is uploaded)
+# but no comment is posted. The paid gateway key is exposed only for same-repo PRs
+# (or manual dispatch); fork PRs run as a no-op so an untrusted diff can neither
+# force paid calls nor prompt-inject the judge.
+#
+# Topology lives in repo variables/secrets so this public workflow carries no
+# internal detail and the two files (this workflow + .github/scripts/
+# security_review_with_llm.py) can be lifted into another repo by setting the same
+# variables and secret.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to review manually."
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: ai-security-review-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || format('refs/pull/{0}/head', github.event.inputs.pr_number) }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install LLM client (hash-pinned)
+        run: pip install --no-cache-dir --require-hashes -r .github/scripts/triage-requirements.txt
+
+      - name: Run AI security review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Expose the paid gateway key ONLY for same-repo PRs or manual dispatch.
+          # Fork PRs get an empty key, so the script runs a no-op dry-run: no paid
+          # LLM call and no comment on an untrusted, potentially prompt-injecting diff.
+          OPENAI_API_KEY: ${{ (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.SECREVIEW_API_KEY || '' }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          SECREVIEW_PROPOSER_MODEL: ${{ vars.SECREVIEW_PROPOSER_MODEL }}
+          SECREVIEW_VERIFIER_MODEL: ${{ vars.SECREVIEW_VERIFIER_MODEL }}
+          SECREVIEW_ENABLED: ${{ vars.SECREVIEW_ENABLED }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          # Post the comment only when explicitly enabled AND a key is present.
+          # `= "true"` (not `!= "false"`) so only the exact string enables posting;
+          # anything else stays dry-run. Mirrors the Agent Shin rollout gate.
+          POST_FLAG="--dry-run"
+          if [ "${SECREVIEW_ENABLED:-false}" = "true" ] && [ -n "${OPENAI_API_KEY:-}" ]; then
+            POST_FLAG=""
+            echo "::notice::AI security review ENABLED — a PR comment will be posted."
+          else
+            echo "::notice::AI security review DRY-RUN — no PR comment (set SECREVIEW_ENABLED=true to post)."
+          fi
+          python3 .github/scripts/security_review_with_llm.py \
+            --repo "${REPO}" \
+            --pr "${PR_NUMBER}" \
+            --sarif-out "${RUNNER_TEMP}/security-review.sarif" \
+            ${POST_FLAG}
+
+      - name: Upload SARIF to code scanning
+        # Only same-repo PRs / dispatch have the security-events write scope and a
+        # meaningful (non-empty) SARIF; fork PRs produced an empty no-op file.
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: ${{ runner.temp }}/security-review.sarif
+          category: ai-security-review
