@@ -42,10 +42,15 @@ jobs:
       pull-requests: write
       security-events: write
     steps:
-      - name: Checkout PR head
+      - name: Checkout trusted ref
+        # Never check out the PR head: on workflow_dispatch the head can be an
+        # attacker-controlled fork PR, and this job holds the paid key plus a
+        # write-scoped token. Check out the trusted base (or the dispatched ref)
+        # so only first-party code runs; the PR's diff and file contents are read
+        # as DATA via the GitHub API inside the script, never executed.
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
-          ref: ${{ github.event.pull_request.head.sha || format('refs/pull/{0}/head', github.event.inputs.pr_number) }}
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
           persist-credentials: false
 
       - name: Set up Python
