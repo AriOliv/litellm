@@ -10,7 +10,8 @@ Pipeline (the diff is untrusted input; the LLM is a pure text-in / JSON-out judg
 no tools, so an instruction injected into a diff can at worst corrupt a finding's text,
 never trigger an action):
 
-  1. Context   - `gh pr view/diff` + the changed files from the local checkout.
+  1. Context   - `gh pr view/diff` plus each changed file's body fetched at the PR
+                 head via the contents API as DATA; PR-authored code is never run.
   2. Propose   - a proposer model (default claude-opus-5) surfaces HIGH/MEDIUM
                  vulnerabilities using the methodology of Claude Code's built-in
                  `security-review` skill (5 categories, 3-phase, data-flow tracing).
@@ -40,12 +41,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
@@ -190,16 +193,27 @@ def default_gh(*args: str) -> str:
     return result.stdout
 
 
-def make_local_reader(root: Path) -> ReadFileFn:
-    """A reader bound to the checked-out repo root; returns None for missing/binary files."""
+def make_api_reader(repo: str, head_sha: str, gh_fn: GhFn) -> ReadFileFn:
+    """Fetch a changed file's content at the PR head as DATA via the contents API.
+
+    The PR head is untrusted (a fork PR is attacker-controlled), so we never check
+    it out or execute anything from it; we read file bodies through the API and
+    treat them as text to analyze. Returns None for missing, binary, or too-large
+    (>1 MB, no inline content) files.
+    """
 
     def _read(path: str) -> str | None:
-        target = root / path
-        if not target.is_file():
+        encoded = urllib.parse.quote(path, safe="/")
+        try:
+            raw = gh_fn("api", f"repos/{repo}/contents/{encoded}?ref={head_sha}", "-q", ".content")
+        except subprocess.CalledProcessError:
+            return None
+        raw = raw.strip().strip('"').strip()
+        if not raw:
             return None
         try:
-            return target.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+            return base64.b64decode(raw).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
             return None
 
     return _read
@@ -269,16 +283,17 @@ def _collect_files(paths: tuple[str, ...], read_file: ReadFileFn) -> tuple[tuple
     return tuple(collected), truncated_any
 
 
-def build_context(repo: str, number: int, *, gh_fn: GhFn, read_file: ReadFileFn) -> ReviewContext:
+def build_context(repo: str, number: int, *, gh_fn: GhFn, read_file: ReadFileFn | None = None) -> ReviewContext:
     meta_raw = gh_fn("pr", "view", str(number), "--repo", repo, "--json", "title,body,headRefOid,files")
     meta = json.loads(meta_raw)
     head_sha = meta.get("headRefOid") or ""
     if not head_sha:
         raise ReviewError(f"could not resolve head SHA for {repo}#{number}")
+    reader = read_file if read_file is not None else make_api_reader(repo, head_sha, gh_fn)
     diff_raw = gh_fn("pr", "diff", str(number), "--repo", repo)
     diff, diff_truncated = _cap(diff_raw, MAX_DIFF_CHARS)
     changed = tuple(entry["path"] for entry in meta.get("files", []) if entry.get("path"))
-    files, files_truncated = _collect_files(changed, read_file)
+    files, files_truncated = _collect_files(changed, reader)
     return ReviewContext(
         repo=repo,
         number=number,
@@ -510,9 +525,9 @@ def review_pr(
     *,
     llm: LLMFn,
     gh_fn: GhFn,
-    read_file: ReadFileFn,
     proposer_model: str,
     verifier_model: str,
+    read_file: ReadFileFn | None = None,
 ) -> ReviewOutcome:
     context = build_context(repo, number, gh_fn=gh_fn, read_file=read_file)
     proposed = propose(context, llm=llm, model=proposer_model)
@@ -729,15 +744,13 @@ def main() -> int:
     parser.add_argument("--sarif-out", default="security-review.sarif")
     parser.add_argument("--dry-run", action="store_true", help="Run the LLM but do not post a comment.")
     parser.add_argument("--print-prompt", action="store_true", help="Print the proposer prompt and exit.")
-    parser.add_argument("--repo-root", default=".", help="Local checkout root for reading changed files.")
     args = parser.parse_args()
 
     api_key = os.environ.get("OPENAI_API_KEY") or ""
     base_url = os.environ.get("OPENAI_BASE_URL") or None
-    read_file = make_local_reader(Path(args.repo_root))
 
     if args.print_prompt:
-        context = build_context(args.repo, args.pr, gh_fn=default_gh, read_file=read_file)
+        context = build_context(args.repo, args.pr, gh_fn=default_gh)
         system, user = build_proposer_prompt(context)
         print(system)
         print("\n\n=== USER ===\n")
@@ -756,7 +769,6 @@ def main() -> int:
         args.pr,
         llm=llm,
         gh_fn=default_gh,
-        read_file=read_file,
         proposer_model=args.proposer_model,
         verifier_model=args.verifier_model,
     )

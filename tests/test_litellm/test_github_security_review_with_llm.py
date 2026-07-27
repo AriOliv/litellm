@@ -9,8 +9,10 @@ dry-run guard that must never reach the LLM.
 
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -177,7 +179,10 @@ class TestParsing:
         assert result.findings == []
 
     def test_proposer_extracts_object_from_prose(self, sr):
-        raw = 'Here you go:\n{"findings": [{"file":"x","line":1,"severity":"HIGH","category":"c","description":"d","confidence":0.9}]}'
+        raw = (
+            'Here you go:\n{"findings": [{"file":"x","line":1,"severity":"HIGH",'
+            '"category":"c","description":"d","confidence":0.9}]}'
+        )
         assert len(sr.parse_proposer(raw).findings) == 1
 
     def test_verifier_malformed_defaults_to_reject(self, sr):
@@ -311,6 +316,43 @@ class TestUpsertComment:
         assert len(mutating) == 1
         assert "PATCH" in mutating[0]
         assert "repos/o/r/issues/comments/99" in mutating[0]
+
+
+class TestApiReader:
+    def test_reads_and_decodes_content_at_head_sha(self, sr):
+        b64 = base64.b64encode(b"hello world").decode()
+
+        def gh(*args):
+            assert args[0] == "api"
+            assert "contents/app.py" in args[1] and "ref=sha1" in args[1]
+            return b64
+
+        reader = sr.make_api_reader("o/r", "sha1", gh)
+        assert reader("app.py") == "hello world"
+
+    def test_missing_file_returns_none(self, sr):
+        def gh(*args):
+            raise subprocess.CalledProcessError(1, ["gh"], stderr="404")
+
+        assert sr.make_api_reader("o/r", "sha1", gh)("gone.py") is None
+
+    def test_build_context_defaults_to_api_reader_not_local_disk(self, sr):
+        meta = {"title": "T", "body": "B", "headRefOid": "sha9", "files": [{"path": "a.py"}]}
+        b64 = base64.b64encode(b"secret code").decode()
+
+        def gh(*args):
+            if "view" in args:
+                return json.dumps(meta)
+            if "diff" in args:
+                return "DIFF"
+            if args[0] == "api" and "contents/a.py" in args[1]:
+                assert "ref=sha9" in args[1]
+                return b64
+            raise AssertionError(f"unexpected gh args: {args}")
+
+        ctx = sr.build_context("o/r", 7, gh_fn=gh)
+        assert ctx.head_sha == "sha9"
+        assert ctx.files[0].content == "secret code"
 
 
 class TestMainNoKeyDryRun:
