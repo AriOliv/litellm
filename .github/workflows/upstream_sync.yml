@@ -1,0 +1,177 @@
+name: Upstream sync
+
+# Weekly, human-approved sync of this fork from upstream BerriAI/litellm.
+#
+# It merges upstream/main into a fresh `litellm_hotfix_upstream_sync_<date>` branch and
+# opens a PR to `main` for a human to review and merge. A clean merge is fully
+# deterministic. On conflict (the `premium_user` line is the usual one) it hands the
+# in-progress merge to Claude Code, which follows the in-repo litellm-fork-upgrade skill
+# to resolve it by the fork's keep/drop principles; the same deterministic push + PR steps
+# then run. It never touches `main` directly — merging the PR is the human gate, and that
+# merge triggers deploy-gateway (build + canary + manual production approval + rollback).
+#
+# The PR is created with the GH_TOKEN PAT (not GITHUB_TOKEN) so it triggers the fork's CI
+# and the AI security review; a GITHUB_TOKEN-opened PR would not.
+
+on:
+  schedule:
+    - cron: "17 13 * * 1" # Mondays 13:17 UTC (~10:17 BRT)
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REMOTE: https://github.com/BerriAI/litellm.git
+  UPSTREAM_BRANCH: main
+
+jobs:
+  sync:
+    if: github.repository == 'AriOliv/litellm'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout fork (full history)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Assess upstream drift
+        id: drift
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "$UPSTREAM_REMOTE"
+          git fetch --no-tags upstream "$UPSTREAM_BRANCH"
+          if git merge-base --is-ancestor "upstream/${UPSTREAM_BRANCH}" HEAD; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Fork already contains upstream/${UPSTREAM_BRANCH}; nothing to sync."
+            exit 0
+          fi
+          echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+          behind="$(git rev-list --count "HEAD..upstream/${UPSTREAM_BRANCH}")"
+          fork_ver="$(grep -m1 -E '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          up_ver="$(git show "upstream/${UPSTREAM_BRANCH}:pyproject.toml" | grep -m1 -E '^version' | sed -E 's/.*"([^"]+)".*/\1/')"
+          {
+            echo "behind=${behind}"
+            echo "fork_ver=${fork_ver}"
+            echo "up_ver=${up_ver}"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Upstream sync"
+            echo "- behind by **${behind}** commits"
+            echo "- version \`${fork_ver}\` -> \`${up_ver}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create sync branch and attempt merge
+        id: merge
+        if: steps.drift.outputs.up_to_date != 'true'
+        run: |
+          set -euo pipefail
+          branch="litellm_hotfix_upstream_sync_$(date -u +%Y_%m_%d)"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          git checkout -b "$branch"
+          if git merge --no-ff --no-edit "upstream/${UPSTREAM_BRANCH}"; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Clean merge of upstream/${UPSTREAM_BRANCH}."
+          else
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Merge conflicts detected; Claude Code will resolve them."
+            git diff --name-only --diff-filter=U >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+
+      - name: Resolve conflicts with Claude Code (follows the fork-upgrade skill)
+        if: steps.merge.outputs.conflict == 'true'
+        uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1.0.183
+        env:
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          anthropic_api_key: ${{ secrets.OPENAI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            A `git merge upstream/main` (upstream is BerriAI/litellm) into this fork is IN
+            PROGRESS and left conflicts. First read .claude/skills/litellm-fork-upgrade/SKILL.md
+            and .claude/skills/litellm-fork-upgrade/references/runbook.md. Then resolve EVERY
+            conflicted file by the fork's keep/drop principles:
+              - KEEP the fork's backend/deploy customizations: `premium_user: bool = True` in
+                litellm/proxy/proxy_server.py; docker-compose.yml's mounted config.yaml and
+                store_model_in_db driven by config (not an env var); the .gitignore negation
+                that tracks .claude/skills/; and the fork-only .github/workflows (deploy-gateway,
+                the AI security review, Agent Shin, guards, this sync workflow).
+              - Take UPSTREAM's version for UI / dashboard files (ui/**).
+            After resolving, run the runbook's verification greps to confirm the customizations
+            survived, then `git add` each resolved file so the merge is fully staged. Do NOT run
+            git commit, do NOT push, and do NOT open a pull request — later workflow steps do
+            that. Leave the resolved merge staged in the working tree.
+          claude_args: |
+            --max-turns 40
+            --model claude-opus-5
+            --allowedTools "Read,Edit,Grep,Glob,Bash(git status),Bash(git diff),Bash(git add),Bash(git checkout),Bash(git restore),Bash(git ls-files),Bash(grep),Bash(cat),Bash(sed),Bash(python3)"
+
+      - name: Finalize merge commit
+        id: finalize
+        if: steps.drift.outputs.up_to_date != 'true'
+        env:
+          CONFLICT: ${{ steps.merge.outputs.conflict }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFLICT" = "true" ]; then
+            if git ls-files -u | grep -q .; then
+              echo "::error::Unresolved merge conflicts remain after Claude Code."
+              git ls-files -u
+              exit 1
+            fi
+            if git diff --check | grep -q .; then
+              echo "::error::Conflict markers remain in resolved files."
+              git diff --check
+              exit 1
+            fi
+            git commit --no-edit
+          fi
+
+      - name: Push branch and open or refresh the PR
+        if: steps.drift.outputs.up_to_date != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          BEHIND: ${{ steps.drift.outputs.behind }}
+          FORK_VER: ${{ steps.drift.outputs.fork_ver }}
+          UP_VER: ${{ steps.drift.outputs.up_ver }}
+          CONFLICT: ${{ steps.merge.outputs.conflict }}
+        run: |
+          set -euo pipefail
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${BRANCH}"
+          if [ "$CONFLICT" = "true" ]; then
+            resolution="Conflicts were resolved by Claude Code following the litellm-fork-upgrade skill. Review the resolution carefully."
+          else
+            resolution="Clean merge, no conflicts."
+          fi
+          body="$(cat <<EOF
+          Automated weekly sync from upstream BerriAI/litellm.
+
+          - behind by ${BEHIND} commits
+          - version \`${FORK_VER}\` -> \`${UP_VER}\`
+          - ${resolution}
+
+          Merging this triggers deploy-gateway (build, then canary + manual production approval + rollback). Watch the deploy canary for config-schema breakage such as the \`oauth2_flow\` class: that lives in the VM's mounted config.yaml, not in this diff. See .claude/skills/litellm-fork-upgrade.
+          EOF
+          )"
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+            echo "::notice::Refreshed existing sync PR #${existing}."
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "chore(sync): upstream BerriAI/litellm -> fork (${UP_VER})" --body "$body"
+          fi
