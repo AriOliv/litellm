@@ -1,0 +1,17 @@
+# Point the load balancer health check at the gateway's liveliness endpoint instead of "/".
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: litellm
+  namespace: ${APP_NAMESPACE}
+spec:
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /health/liveliness
+        port: 4000
+  targetRef:
+    group: ""
+    kind: Service
+    name: litellm

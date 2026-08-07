@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: ${APP_NAMESPACE}
+  labels:
+    app: litellm
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: litellm
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      serviceAccountName: ${GATEWAY_KSA}
+      # Spread replicas across zones for HA.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: litellm
+      containers:
+        - name: litellm
+          image: ${IMAGE}
+          args: ["--config=/app/config.yaml"]
+          ports:
+            - name: http
+              containerPort: 4000
+          envFrom:
+            # k8s Secret synced from Secret Manager by the CSI driver (see secretproviderclass.yaml).
+            - secretRef:
+                name: litellm-secrets
+          env:
+            - name: STORE_MODEL_IN_DB
+              value: "True"
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+        # Cloud SQL Auth Proxy: the gateway reaches Postgres at 127.0.0.1:5432 over IAM.
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+          args:
+            - "--structured-logs"
+            - "--port=5432"
+            - "${CLOUDSQL_CONNECTION_NAME}"
+          securityContext:
+            runAsNonRoot: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: litellm-secrets
