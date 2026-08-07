@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: ${APP_NAMESPACE}
+  annotations:
+    # Container-native load balancing (NEG) so the Gateway routes straight to pods.
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  type: ClusterIP
+  selector:
+    app: litellm
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

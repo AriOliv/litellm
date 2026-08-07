@@ -1,0 +1,14 @@
+# Raise the load balancer backend timeout well above the 30s default so LLM streaming (SSE) and long
+# completions are not cut off mid-response.
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: litellm
+  namespace: ${APP_NAMESPACE}
+spec:
+  default:
+    timeoutSec: 3600
+  targetRef:
+    group: ""
+    kind: Service
+    name: litellm

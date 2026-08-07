@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill from your private notes. Do not commit terraform.tfvars.
+project_id = "your-project-id"
+region     = "southamerica-east1"
+
+# Optional overrides (defaults are sensible):
+# cluster_name     = "litellm-gateway"
+# artifact_repo    = "litellm"          # set "" to reuse an existing gcr.io path
+# db_tier          = "db-custom-2-8192" # right-size from observed load
+# db_disk_size_gb  = 40                 # source DB is ~22 GB; autoresize is on
+# deletion_protection = true

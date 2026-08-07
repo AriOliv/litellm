@@ -1,0 +1,22 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: litellm
+  namespace: ${APP_NAMESPACE}
+  annotations:
+    # Reserved global static IP (from Terraform) and the Certificate Manager cert map holding the
+    # Google-managed cert for the gateway domain.
+    networking.gke.io/certmap: ${CERT_MAP_NAME}
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  addresses:
+    - type: NamedAddress
+      value: ${STATIC_IP_NAME}
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: ${GATEWAY_DOMAIN}
+      allowedRoutes:
+        namespaces:
+          from: Same
