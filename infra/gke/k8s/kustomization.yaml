@@ -3,10 +3,12 @@ kind: Kustomization
 
 # The litellm-config ConfigMap is created out-of-band from the VM's config.yaml (Phase 2), because
 # that file is not kept in this repo. Everything else is here.
+# secretproviderclass.yaml is the Secret Manager CSI hardening path; it needs the cluster's Secret
+# Manager add-on and its CRD. The initial stand-up creates the litellm-secrets Secret directly, so
+# it is intentionally not applied here.
 resources:
   - namespace.yaml
   - serviceaccount.yaml
-  - secretproviderclass.yaml
   - deployment.yaml
   - service.yaml
   - hpa.yaml

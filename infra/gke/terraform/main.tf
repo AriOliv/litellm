@@ -61,6 +61,7 @@ resource "google_sql_database_instance" "pg" {
   deletion_protection = var.deletion_protection
 
   settings {
+    edition           = "ENTERPRISE"
     tier              = var.db_tier
     availability_type = "REGIONAL"
     disk_type         = "PD_SSD"
@@ -123,6 +124,8 @@ resource "google_service_account_iam_member" "wi_bind" {
   service_account_id = google_service_account.gateway.name
   role               = "roles/iam.workloadIdentityUser"
   member             = local.wi_member
+  # The workload identity pool (PROJECT.svc.id.goog) only exists once the cluster does.
+  depends_on = [google_container_cluster.autopilot]
 }
 
 resource "google_project_iam_member" "cloudsql_client" {

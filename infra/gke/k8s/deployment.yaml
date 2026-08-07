@@ -48,9 +48,6 @@ spec:
               mountPath: /app/config.yaml
               subPath: config.yaml
               readOnly: true
-            - name: secrets-store
-              mountPath: /mnt/secrets-store
-              readOnly: true
           readinessProbe:
             httpGet:
               path: /health/readiness
@@ -92,9 +89,7 @@ spec:
         - name: config
           configMap:
             name: litellm-config
-        - name: secrets-store
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: litellm-secrets
+      # Secrets come from the k8s Secret `litellm-secrets` via envFrom above. For the initial
+      # stand-up that Secret is created directly from the VM .env (--from-env-file). The Secret
+      # Manager CSI driver (secretproviderclass.yaml) is the production-hardening path: enable the
+      # cluster's Secret Manager add-on, re-add the CSI volume/mount, and let it populate the Secret.
