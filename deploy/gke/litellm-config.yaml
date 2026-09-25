@@ -586,6 +586,13 @@ router_settings:
     "claude-g.lm-4.5-air": "glm-4.5-air"
     "claude-k.imi-k3": "kimi-k3"
     "claude-g.rok-4.5": "grok-4.5"
+    # `[1m]` is how Claude Code marks a model as 1M-context in its picker, and it
+    # sends the suffix as part of the model id. These resolve to the real group so
+    # the suffix never reaches the provider.
+    "claude-opus-5-5[1m]": "claude-opus-5-5"
+    "claude-g.p.t-6[1m]": "gpt-6"
+    "claude-g.p.t-5.6-sol[1m]": "gpt-5.6-sol"
+    "claude-sonnet-5[1m]": "claude-sonnet-5"
   fallbacks:
     - {"claude-opus-4-7": ["glm-5.1"]}
     - {"claude-opus-5": ["claude-opus-5-azure"]}
