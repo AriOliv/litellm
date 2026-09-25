@@ -1,0 +1,624 @@
+model_list:
+  - model_name: gpt-5.1-chat
+    litellm_params:
+      model: azure/gpt-5.1-chat
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+
+  - model_name: gpt-5.2-chat
+    litellm_params:
+      model: azure/gpt-5.2-chat
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+
+  - model_name: gpt-5.3-chat
+    litellm_params:
+      model: azure/gpt-5.3-chat
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+
+  - model_name: gpt-5.4-pro
+    litellm_params:
+      model: azure/gpt-5.4-pro
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+
+  - model_name: gpt-6
+    litellm_params:
+      model: azure/gpt-6-astra
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      input_cost_per_token: 0.00001    # $10 / 1M (GPT-6 Astra; OpenAI list, Azure Global Standard)
+      output_cost_per_token: 0.00005   # $50 / 1M
+      cache_read_input_token_cost: 0.000001  # $1 / 1M
+
+  - model_name: gpt-5.5
+    litellm_params:
+      model: azure/gpt-5.5
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+
+  - model_name: gpt-5.6-sol
+    litellm_params:
+      model: azure/gpt-5.6-sol
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      input_cost_per_token: 0.000005
+      output_cost_per_token: 0.00003
+
+  - model_name: gpt-5.6-terra
+    litellm_params:
+      model: azure/gpt-5.6-terra
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      input_cost_per_token: 0.0000025
+      output_cost_per_token: 0.000015
+
+  - model_name: gpt-5.6-luna
+    litellm_params:
+      model: azure/gpt-5.6-luna
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      input_cost_per_token: 0.000001
+      output_cost_per_token: 0.000006
+
+  - model_name: grok-4-1-fast-reasoning
+    litellm_params:
+      model: azure/grok-4-1-fast-reasoning
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      # xAI direct pricing reference; Azure Foundry may differ — check portal.
+      input_cost_per_token: 0.0000002
+      output_cost_per_token: 0.0000005
+
+  - model_name: grok-4.3
+    litellm_params:
+      model: azure/grok-4.3
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      # xAI direct pricing reference; Azure Foundry may differ — check portal.
+      input_cost_per_token: 0.00000125   # $1.25 / 1M
+      output_cost_per_token: 0.0000025   # $2.50 / 1M
+
+  - model_name: Kimi-K2.6
+    litellm_params:
+      model: azure/Kimi-K2.6
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      # Moonshot direct pricing reference; Azure deployment may differ.
+      input_cost_per_token: 0.00000055
+      output_cost_per_token: 0.00000265
+
+  - model_name: Kimi-K2.7-Code
+    litellm_params:
+      model: azure/Kimi-K2.7-Code
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      # Moonshot K2 reference; Azure Foundry deployment may differ — check portal.
+      input_cost_per_token: 0.00000055
+      output_cost_per_token: 0.00000265
+
+  - model_name: DeepSeek-V4-Pro
+    litellm_params:
+      model: azure/DeepSeek-V4-Pro
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      # DeepSeek direct pricing (permanent post-discount); Azure Foundry may differ.
+      input_cost_per_token: 0.000000435  # $0.435 / 1M
+      output_cost_per_token: 0.00000087  # $0.87 / 1M
+
+  - model_name: model-router
+    litellm_params:
+      model: azure/model-router
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    # Pass-through pricing — depends on the model the router picks at runtime.
+    # No fixed price set; spend is reported by the underlying deployment.
+
+  - model_name: whisper
+    litellm_params:
+      model: azure/whisper
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      mode: audio_transcription
+      # Azure: $0.006/min = $0.0001/sec
+      input_cost_per_second: 0.0001
+
+  - model_name: text-embedding-3-large
+    litellm_params:
+      model: azure/text-embedding-3-large
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      mode: embedding
+      # Azure: $0.00013 / 1K tokens
+      input_cost_per_token: 0.00000013
+
+  - model_name: DeepSeek-V4-Flash
+    litellm_params:
+      model: azure/DeepSeek-V4-Flash
+      api_base: os.environ/AZURE_DEEPSEEK_API_BASE
+      api_key: os.environ/AZURE_DEEPSEEK_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      # DeepSeek V4 Flash: $0.14 / $0.28 per 1M
+      input_cost_per_token: 0.00000014
+      output_cost_per_token: 0.00000028
+
+  - model_name: claude-fable-5-1
+    litellm_params:
+      model: anthropic/claude-fable-5-1
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      input_cost_per_token: 0.00001            # $10 / 1M
+      output_cost_per_token: 0.00005           # $50 / 1M
+      cache_creation_input_token_cost: 0.0000125
+      cache_creation_input_token_cost_above_1hr: 0.00002
+      cache_read_input_token_cost: 0.00000025
+  - model_name: claude-fable-5
+    litellm_params:
+      model: anthropic/claude-fable-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      input_cost_per_token: 0.00001    # $10.00 / 1M
+      output_cost_per_token: 0.00005   # $50.00 / 1M
+
+  - model_name: claude-opus-5
+    litellm_params:
+      model: anthropic/claude-opus-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      input_cost_per_token: 0.000005
+      output_cost_per_token: 0.000025
+  - model_name: claude-opus-5-5
+    litellm_params:
+      model: anthropic/claude-opus-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      input_cost_per_token: 0.000004
+      output_cost_per_token: 0.00002
+      cache_read_input_token_cost: 0.0000002
+      cache_creation_input_token_cost: 0.000005
+  - model_name: claude-opus-5-azure
+    litellm_params:
+      model: azure_ai/claude-opus-5
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      input_cost_per_token: 0.000005
+      output_cost_per_token: 0.000025
+  - model_name: claude-opus-4-8
+    litellm_params:
+      model: anthropic/claude-opus-4-8
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-opus-4-7
+    litellm_params:
+      model: anthropic/claude-opus-4-7
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-sonnet-5
+    litellm_params:
+      model: anthropic/claude-sonnet-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      # Introductory pricing through 2026-08-31; reverts to $3/$15 per 1M after.
+      input_cost_per_token: 0.000002    # $2.00 / 1M
+      output_cost_per_token: 0.00001    # $10.00 / 1M
+
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: anthropic/claude-haiku-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Google Gemini — text
+  - model_name: gemini-3.1-pro
+    litellm_params:
+      model: gemini/gemini-3.1-pro-preview
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-3-flash
+    litellm_params:
+      model: gemini/gemini-3-flash-preview
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-3.1-flash-lite
+    litellm_params:
+      model: gemini/gemini-3.1-flash-lite-preview
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-3.5-flash
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: gemini-3.8-flash
+    litellm_params:
+      model: gemini/gemini-3.8-flash
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      input_cost_per_token: 0.00000075         # $0.75 / 1M (promo ate 2026-12-31)
+      output_cost_per_token: 0.00000375        # $3.75 / 1M incl thinking
+      output_cost_per_reasoning_token: 0.00000375
+      cache_read_input_token_cost: 0.000000075
+  - model_name: gemini-3.6-flash
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: gemini-3.7-flash
+    litellm_params:
+      model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000015          # $1.50 / 1M
+      output_cost_per_token: 0.000009          # $9.00 / 1M
+      output_cost_per_reasoning_token: 0.000009
+      cache_read_input_token_cost: 0.00000015  # $0.15 / 1M
+
+  - model_name: gemini-2.5-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # Google Gemini — embedding
+  - model_name: gemini-embedding-2
+    litellm_params:
+      model: gemini/gemini-embedding-2
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      mode: embedding
+      # Gemini Embedding 2: $0.20 / 1M input tokens
+      input_cost_per_token: 0.0000002
+
+  # Google Gemini — image generation (Nano Banana)
+  - model_name: nano-banana-pro
+    litellm_params:
+      model: gemini/gemini-3-pro-image-preview
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      mode: image_generation
+
+  - model_name: nano-banana-2
+    litellm_params:
+      model: gemini/gemini-3.1-flash-image-preview
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      mode: image_generation
+
+  # Google Veo — video generation
+  - model_name: veo-3.1
+    litellm_params:
+      model: gemini/veo-3.1-generate-preview
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      mode: video_generation
+      # Veo 3.1 Standard: $0.40 / second of generated video
+      output_cost_per_second: 0.40
+
+  - model_name: veo-3.1-lite
+    litellm_params:
+      model: gemini/veo-3.1-lite-generate-preview
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      mode: video_generation
+      # Veo 3.1 Lite: $0.05 / second
+      output_cost_per_second: 0.05
+
+  # Groq — text (Llama, Qwen, OSS GPT, Groq Compound)
+  - model_name: llama-4-scout
+    litellm_params:
+      model: groq/meta-llama/llama-4-scout-17b-16e-instruct
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: llama-3.3-70b
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: llama-3.1-8b
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: qwen3.8-27b
+    litellm_params:
+      model: groq/qwen/qwen3.8-27b
+      api_key: os.environ/GROQ_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000008          # $0.80 / 1M
+      output_cost_per_token: 0.000004          # $4.00 / 1M
+  - model_name: qwen3-32b
+    litellm_params:
+      model: groq/qwen/qwen3-32b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: gpt-oss-120b
+    litellm_params:
+      model: groq/openai/gpt-oss-120b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: gpt-oss-20b
+    litellm_params:
+      model: groq/openai/gpt-oss-20b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: groq-compound
+    litellm_params:
+      model: groq/groq/compound
+      api_key: os.environ/GROQ_API_KEY
+    # Pass-through pricing — Groq Compound is a system that orchestrates
+    # underlying models + tools. Charges are passed through from the
+    # underlying calls. No fixed price set.
+
+  - model_name: groq-compound-mini
+    litellm_params:
+      model: groq/groq/compound-mini
+      api_key: os.environ/GROQ_API_KEY
+    # Pass-through pricing (same reason as groq-compound).
+
+  # Groq — audio transcription (Whisper)
+  - model_name: whisper-v3-turbo
+    litellm_params:
+      model: groq/whisper-large-v3-turbo
+      api_key: os.environ/GROQ_API_KEY
+    model_info:
+      mode: audio_transcription
+      # Groq: $0.04 / hour = $0.04 / 3600 ≈ $0.00001111 / sec
+      input_cost_per_second: 0.0000111
+
+  - model_name: whisper-v3
+    litellm_params:
+      model: groq/whisper-large-v3
+      api_key: os.environ/GROQ_API_KEY
+    model_info:
+      mode: audio_transcription
+      # Groq: $0.111 / hour = $0.111 / 3600 ≈ $0.00003083 / sec
+      input_cost_per_second: 0.0000308
+
+  # Z.AI (Zhipu / GLM) — Anthropic-compatible endpoint
+  # Pricing source: https://docs.z.ai/guides/overview/pricing
+  - model_name: glm-5.3
+    litellm_params:
+      model: anthropic/glm-5.3
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000014          # $1.40 / 1M
+      output_cost_per_token: 0.0000044         # $4.40 / 1M
+      cache_read_input_token_cost: 0.00000026
+  - model_name: glm-5.2
+    litellm_params:
+      model: anthropic/glm-5.2
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000014   # $1.40 / 1M
+      output_cost_per_token: 0.0000044  # $4.40 / 1M
+
+  - model_name: glm-5.1
+    litellm_params:
+      model: anthropic/glm-5.1
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000014   # $1.40 / 1M
+      output_cost_per_token: 0.0000044  # $4.40 / 1M
+
+  - model_name: glm-5
+    litellm_params:
+      model: anthropic/glm-5
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.000001    # $1.00 / 1M
+      output_cost_per_token: 0.0000032  # $3.20 / 1M
+
+  - model_name: glm-5-turbo
+    litellm_params:
+      model: anthropic/glm-5-turbo
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000012   # $1.20 / 1M
+      output_cost_per_token: 0.000004   # $4.00 / 1M
+
+  - model_name: glm-4.7
+    litellm_params:
+      model: anthropic/glm-4.7
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000006   # $0.60 / 1M
+      output_cost_per_token: 0.0000022  # $2.20 / 1M
+
+  - model_name: glm-4.6
+    litellm_params:
+      model: anthropic/glm-4.6
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000006   # $0.60 / 1M
+      output_cost_per_token: 0.0000022  # $2.20 / 1M
+
+  - model_name: glm-4.5
+    litellm_params:
+      model: anthropic/glm-4.5
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000006   # $0.60 / 1M
+      output_cost_per_token: 0.0000022  # $2.20 / 1M
+
+  - model_name: glm-4.5-air
+    litellm_params:
+      model: anthropic/glm-4.5-air
+      api_base: os.environ/ZAI_API_BASE
+      api_key: os.environ/ZAI_API_KEY
+    model_info:
+      input_cost_per_token: 0.0000002   # $0.20 / 1M
+      output_cost_per_token: 0.0000011  # $1.10 / 1M
+  - model_name: kimi-k3
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k3
+      api_key: os.environ/OPENROUTER_API_KEY
+    model_info:
+      input_cost_per_token: 0.000003
+      output_cost_per_token: 0.000015
+  - model_name: grok-4.5
+    litellm_params:
+      model: openrouter/x-ai/grok-4.5
+      api_key: os.environ/OPENROUTER_API_KEY
+    model_info:
+      input_cost_per_token: 0.000002
+      output_cost_per_token: 0.000006
+
+litellm_settings:
+  cache: true
+  cache_params:
+    type: redis
+    host: redis
+    port: 6379
+    password: os.environ/REDIS_PASSWORD
+    ttl: 3600
+  master_key: os.environ/LITELLM_MASTER_KEY
+  drop_params: True
+  num_retries: 3
+  request_timeout: 600
+  telemetry: False
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+  # Audit logs — tracks create/update/delete on keys, teams, users, models, etc.
+  # Persisted in LiteLLM_AuditLog table. Enterprise feature.
+  store_audit_logs: true
+
+router_settings:
+  redis_host: redis
+  redis_port: 6379
+  redis_password: os.environ/REDIS_PASSWORD
+  # `anthropic-*` aliases expose non-Claude chat models to clients that only
+  # surface models whose id begins with "claude"/"anthropic" (e.g. Claude Code's
+  # /model gateway discovery). They route to the real model group, so no
+  # provider credentials are duplicated. Non-chat models (transcription,
+  # embedding, image, video) are intentionally not aliased.
+  model_group_alias:
+    "claude-haiku-4-5-20251001": "claude-haiku-4-5"
+    "claude-g.p.t-6": "gpt-6"
+    "claude-g.p.t-5.5": "gpt-5.5"
+    "claude-g.p.t-5.6-sol": "gpt-5.6-sol"
+    "claude-g.p.t-5.6-terra": "gpt-5.6-terra"
+    "claude-g.p.t-5.6-luna": "gpt-5.6-luna"
+    "claude-g.p.t-5.4-pro": "gpt-5.4-pro"
+    "claude-g.p.t-5.3": "gpt-5.3-chat"
+    "claude-g.p.t-5.2": "gpt-5.2-chat"
+    "claude-g.p.t-5.1": "gpt-5.1-chat"
+    "claude-g.p.t-oss-120b": "gpt-oss-120b"
+    "claude-g.p.t-oss-20b": "gpt-oss-20b"
+    "claude-model-router": "model-router"
+    "claude-g.rok-4.3": "grok-4.3"
+    "claude-g.rok-4.1-fast": "grok-4-1-fast-reasoning"
+    "claude-k.imi-k2-6": "Kimi-K2.6"
+    "claude-k.imi-k2-7-code": "Kimi-K2.7-Code"
+    "claude-deep-seek-v4-pro": "DeepSeek-V4-Pro"
+    "claude-deep-seek-v4-flash": "DeepSeek-V4-Flash"
+    "claude-g.emini-3.1-pro": "gemini-3.1-pro"
+    "claude-g.emini-3-flash": "gemini-3-flash"
+    "claude-g.emini-3.1-flash-lite": "gemini-3.1-flash-lite"
+    "claude-g.emini-3.8-flash": "gemini-3.8-flash"
+    "claude-g.emini-3.5-flash": "gemini-3.5-flash"
+    "claude-g.emini-2.5-pro": "gemini-2.5-pro"
+    "claude-g.emini-2.5-flash": "gemini-2.5-flash"
+    "claude-l.lama-4-scout": "llama-4-scout"
+    "claude-l.lama-3.3-70b": "llama-3.3-70b"
+    "claude-l.lama-3.1-8b": "llama-3.1-8b"
+    "claude-q.wen3.8-27b": "qwen3.8-27b"
+    "claude-q.wen3-32b": "qwen3-32b"
+    "claude-groq-compound": "groq-compound"
+    "claude-groq-compound-mini": "groq-compound-mini"
+    "claude-g.lm-5.3": "glm-5.3"
+    "claude-g.lm-5.2": "glm-5.2"
+    "claude-g.lm-5.1": "glm-5.1"
+    "claude-g.lm-5": "glm-5"
+    "claude-g.lm-5-turbo": "glm-5-turbo"
+    "claude-g.lm-4.7": "glm-4.7"
+    "claude-g.lm-4.6": "glm-4.6"
+    "claude-g.lm-4.5": "glm-4.5"
+    "claude-g.lm-4.5-air": "glm-4.5-air"
+    "claude-k.imi-k3": "kimi-k3"
+    "claude-g.rok-4.5": "grok-4.5"
+    # `[1m]` is how Claude Code marks a model as 1M-context in its picker, and it
+    # sends the suffix as part of the model id. These resolve to the real group so
+    # the suffix never reaches the provider.
+    "claude-opus-5-5[1m]": "claude-opus-5-5"
+    "claude-g.p.t-6[1m]": "gpt-6"
+    "claude-g.p.t-5.6-sol[1m]": "gpt-5.6-sol"
+    "claude-sonnet-5[1m]": "claude-sonnet-5"
+  fallbacks:
+    - {"claude-opus-4-7": ["glm-5.1"]}
+    - {"claude-opus-5": ["claude-opus-5-azure"]}
+
+mcp_servers:
+  avenia:
+    transport: "http"
+    url: "https://99p4fbzmj3.eu-west-1.awsapprunner.com/mcp"
+    auth_type: "oauth2"
+    oauth2_flow: "authorization_code"
+    description: "Avenia API — payments, KYC, beneficiaries, tickets, compliance ops (100 tools)"
+
+general_settings:
+  # Enable UI-managed settings such as auto routers while keeping `models` and
+  # `mcp` sourced from config.yaml via supported_db_objects below.
+  store_model_in_db: true
+  # Carrega tudo do DB exceto "models" e "mcp" — ambos source-of-truth do config.yaml
+  supported_db_objects:
+    - guardrails
+    - policies
+    - vector_stores
+    - pass_through_endpoints
+    - prompts
+    - model_cost_map
+    - tools
+    - config_overrides
+  store_prompts_in_spend_logs: true
+  forward_client_headers_to_llm_api: true
+
