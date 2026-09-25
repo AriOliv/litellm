@@ -27,6 +27,18 @@ model_list:
       api_key: os.environ/AZURE_API_KEY
       api_version: os.environ/AZURE_API_VERSION
 
+  - model_name: gpt-6
+    litellm_params:
+      model: azure/gpt-6-astra
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      input_cost_per_token: 0.00001    # $10 / 1M (GPT-6 Astra; OpenAI list, Azure Global Standard)
+      output_cost_per_token: 0.00005   # $50 / 1M
+      cache_read_input_token_cost: 0.000001  # $1 / 1M
+
   - model_name: gpt-5.5
     litellm_params:
       model: azure/gpt-5.5
@@ -41,6 +53,7 @@ model_list:
       api_key: os.environ/AZURE_API_KEY
       api_version: os.environ/AZURE_API_VERSION
     model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
       input_cost_per_token: 0.000005
       output_cost_per_token: 0.00003
 
@@ -184,6 +197,26 @@ model_list:
       model: anthropic/claude-opus-5
       api_key: os.environ/ANTHROPIC_API_KEY
     model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      input_cost_per_token: 0.000005
+      output_cost_per_token: 0.000025
+  - model_name: claude-opus-5-5
+    litellm_params:
+      model: anthropic/claude-opus-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      input_cost_per_token: 0.000004
+      output_cost_per_token: 0.00002
+      cache_read_input_token_cost: 0.0000002
+      cache_creation_input_token_cost: 0.000005
+  - model_name: claude-opus-5-azure
+    litellm_params:
+      model: azure_ai/claude-opus-5
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
       input_cost_per_token: 0.000005
       output_cost_per_token: 0.000025
   - model_name: claude-opus-4-8
@@ -510,6 +543,7 @@ router_settings:
   # embedding, image, video) are intentionally not aliased.
   model_group_alias:
     "claude-haiku-4-5-20251001": "claude-haiku-4-5"
+    "claude-g.p.t-6": "gpt-6"
     "claude-g.p.t-5.5": "gpt-5.5"
     "claude-g.p.t-5.6-sol": "gpt-5.6-sol"
     "claude-g.p.t-5.6-terra": "gpt-5.6-terra"
@@ -554,6 +588,7 @@ router_settings:
     "claude-g.rok-4.5": "grok-4.5"
   fallbacks:
     - {"claude-opus-4-7": ["glm-5.1"]}
+    - {"claude-opus-5": ["claude-opus-5-azure"]}
 
 mcp_servers:
   avenia:
