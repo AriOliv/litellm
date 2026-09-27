@@ -1,0 +1,122 @@
+name: Deploy gateway
+
+# Build an immutable linux/amd64 image and deploy it to the GKE gateway after
+# production-environment approval. The ConfigMap is managed separately from
+# deploy/gke/litellm-config.yaml.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "litellm/**"
+      - "ui/**"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "docker/**"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-gateway
+  cancel-in-progress: false
+
+env:
+  GKE_CLUSTER: litellm-gateway
+  GKE_LOCATION: southamerica-east1
+  GKE_NAMESPACE: litellm
+
+jobs:
+  build:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      - name: Log in to registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: gcr.io
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Compute image tag
+        id: meta
+        env:
+          IMAGE: ${{ vars.GCR_IMAGE }}
+        run: echo "image=${IMAGE}:git-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push immutable image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ${{ steps.meta.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to GKE
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@3da1e46c5fdcb9bb56e5f7c6650ed23f7edce1e4 # v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_LOCATION }}
+          project_id: ${{ vars.GCP_PROJECT }}
+
+      - name: Deploy image
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+        run: |
+          set -euo pipefail
+          previous="$(kubectl -n "$GKE_NAMESPACE" get deployment litellm -o jsonpath='{.spec.template.spec.containers[?(@.name=="litellm")].image}')"
+          kubectl -n "$GKE_NAMESPACE" set image deployment/litellm "litellm=${IMAGE}"
+          if ! kubectl -n "$GKE_NAMESPACE" rollout status deployment/litellm --timeout=10m; then
+            kubectl -n "$GKE_NAMESPACE" set image deployment/litellm "litellm=${previous}"
+            kubectl -n "$GKE_NAMESPACE" rollout status deployment/litellm --timeout=10m
+            exit 1
+          fi
+
+      - name: Verify gateway
+        env:
+          GATEWAY_URL: https://proxy.avenia.tech
+        run: |
+          set -euo pipefail
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' "${GATEWAY_URL}/health/liveliness")"
+          test "$code" = "200"

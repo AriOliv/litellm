@@ -46,7 +46,6 @@ model_list:
       api_key: os.environ/AZURE_API_KEY
       api_version: os.environ/AZURE_API_VERSION
     model_info:
-      base_model: azure/gpt-5.6-sol
       team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
 
   - model_name: gpt-6-luna
@@ -55,9 +54,6 @@ model_list:
       api_base: os.environ/AZURE_API_BASE
       api_key: os.environ/AZURE_API_KEY
       api_version: os.environ/AZURE_API_VERSION
-    model_info:
-      base_model: azure/gpt-5.6-sol
-
   - model_name: gpt-5.5
     litellm_params:
       model: azure/gpt-5.5
