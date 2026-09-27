@@ -39,6 +39,25 @@ model_list:
       output_cost_per_token: 0.00005   # $50 / 1M
       cache_read_input_token_cost: 0.000001  # $1 / 1M
 
+  - model_name: gpt-6-sol
+    litellm_params:
+      model: azure/gpt-6-sol
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      base_model: azure/gpt-5.6-sol
+      team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+
+  - model_name: gpt-6-luna
+    litellm_params:
+      model: azure/gpt-6-luna
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: os.environ/AZURE_API_VERSION
+    model_info:
+      base_model: azure/gpt-5.6-sol
+
   - model_name: gpt-5.5
     litellm_params:
       model: azure/gpt-5.5
@@ -544,6 +563,8 @@ router_settings:
   model_group_alias:
     "claude-haiku-4-5-20251001": "claude-haiku-4-5"
     "claude-g.p.t-6": "gpt-6"
+    "claude-g.p.t-6-sol": "gpt-6-sol"
+    "claude-g.p.t-6-luna": "gpt-6-luna"
     "claude-g.p.t-5.5": "gpt-5.5"
     "claude-g.p.t-5.6-sol": "gpt-5.6-sol"
     "claude-g.p.t-5.6-terra": "gpt-5.6-terra"
@@ -591,6 +612,8 @@ router_settings:
     # the suffix never reaches the provider.
     "claude-opus-5-5[1m]": "claude-opus-5-5"
     "claude-g.p.t-6[1m]": "gpt-6"
+    "claude-g.p.t-6-sol[1m]": "gpt-6-sol"
+    "claude-g.p.t-6-luna[1m]": "gpt-6-luna"
     "claude-g.p.t-5.6-sol[1m]": "gpt-5.6-sol"
     "claude-sonnet-5[1m]": "claude-sonnet-5"
   fallbacks:
@@ -621,4 +644,3 @@ general_settings:
     - config_overrides
   store_prompts_in_spend_logs: true
   forward_client_headers_to_llm_api: true
-
