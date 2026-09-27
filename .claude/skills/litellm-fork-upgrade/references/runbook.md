@@ -1,5 +1,17 @@
 # LiteLLM Fork Upgrade Runbook
 
+## Check Upstream First
+
+Before editing code or building an image:
+
+1. Search upstream `main` for the bug and its tests
+2. Identify the first upstream commit and tag containing the fix
+3. Check whether an official image exists for that tag
+4. Prefer the official image for canary and deployment
+
+Build a custom image only when the official release lacks the fix or the gateway
+requires a verified fork-only source change. Record that reason before building.
+
 ## Assess
 
 ```bash

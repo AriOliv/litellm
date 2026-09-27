@@ -33,16 +33,18 @@ Read `references/runbook.md` for exact commands.
 
 ## Upgrade Sequence
 
-1. Fetch both remotes and record versions and divergence
-2. Create a backup branch of the current fork
-3. Create a fresh upgrade branch at `origin/main`
-4. Reapply the curated fork-owned paths only
-5. Validate config, targeted behavior, and repository checks
-6. Build an immutable `linux/amd64` image
-7. Start a disposable config canary before touching the deployment
-8. Roll out to GKE with the previous image recorded for rollback
-9. Verify health and real completions on critical routes
-10. Push the reviewed upgrade branch, then replace fork `main` only after approval
+1. Check upstream source, tags, and official images for the requested fix
+2. Prefer an official image when it already contains the fix
+3. Fetch both remotes and record versions and divergence
+4. Create a backup branch of the current fork
+5. Create a fresh upgrade branch at `origin/main`
+6. Reapply the curated fork-owned paths only
+7. Validate config, targeted behavior, and repository checks
+8. Build a custom image only when fork-only code remains necessary
+9. Start a disposable config canary before touching the deployment
+10. Roll out to GKE with the previous image recorded for rollback
+11. Verify health and real completions on critical routes
+12. Push the reviewed upgrade branch, then replace fork `main` only after approval
 
 ## Rules
 
@@ -51,4 +53,5 @@ Read `references/runbook.md` for exact commands.
 - Never print or commit Kubernetes secrets
 - Use immutable image tags and preserve the previous deployment image
 - Take upstream's UI wholesale
+- Never build a custom image before checking whether an official upstream image contains the fix
 - Validate current production config against the candidate image before rollout
