@@ -1,0 +1,8 @@
+ARG BASE_IMAGE=docker.litellm.ai/berriai/litellm:v1.104.0-dev.2
+FROM ${BASE_IMAGE}
+
+USER root
+RUN target=/app/.venv/lib/python3.13/site-packages/litellm/proxy/proxy_server.py && \
+    grep -Fq 'premium_user: bool = _license_check.is_premium()' "$target" && \
+    sed -i 's/premium_user: bool = _license_check.is_premium()/premium_user: bool = True/' "$target" && \
+    grep -Fq 'premium_user: bool = True' "$target"

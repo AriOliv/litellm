@@ -12,6 +12,11 @@ Before editing code or building an image:
 Build a custom image only when the official release lacks the fix or the gateway
 requires a verified fork-only source change. Record that reason before building.
 
+This fork has one explicit image-level exception: the gateway requires
+`premium_user: bool = True` for its configured SSO population. Build it as the
+minimal `docker/Dockerfile.avenia` layer over the verified official image rather
+than rebuilding LiteLLM from source.
+
 ## Assess
 
 ```bash

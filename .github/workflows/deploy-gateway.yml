@@ -6,7 +6,7 @@ name: Deploy gateway
 
 on:
   push:
-    branches: [main]
+    branches: [main, litellm_upstream_1_104_0]
     paths:
       - "litellm/**"
       - "ui/**"
@@ -68,6 +68,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
+          file: docker/Dockerfile.avenia
           platforms: linux/amd64
           push: true
           provenance: false

@@ -22,6 +22,8 @@ Read `references/runbook.md` for exact commands.
 - the cross-model security review workflow and script
 - this skill and the `.gitignore` rule that allows it to be tracked
 - `docker-compose.yml` configuration mounting, where still useful locally
+- the `premium_user: bool = True` SSO bypass required by this gateway
+- `docker/Dockerfile.avenia`, the minimal layer over the official upstream image
 
 ## Take From Upstream
 
@@ -29,7 +31,7 @@ Read `references/runbook.md` for exact commands.
 - LiteLLM provider and routing code unless a current production regression proves
   that upstream still lacks a required fix
 - Docker runtime dependencies already present upstream
-- license evaluation; do not restore a hard-coded premium flag
+- all other license and enterprise behavior outside the required SSO bypass
 
 ## Upgrade Sequence
 
