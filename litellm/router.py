@@ -11577,7 +11577,7 @@ class Router:
         If a team_id is provided, only deployments configured with that team_id (i.e. team‐specific models)
         will yield their team public name.
         """
-        deployments: Final = self.get_model_list() or []
+        deployments: Final = self.get_model_list(team_id=team_id) or []
         model_names: Final = []
 
         for deployment in deployments:

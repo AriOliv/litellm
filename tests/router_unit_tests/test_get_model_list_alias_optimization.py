@@ -70,3 +70,25 @@ def test_model_alias_resolves_own_team_deployment():
 
     assert own_models and own_models[0]["model_name"] == "private-model[1m]"
     assert other_models == []
+
+
+def test_model_names_include_alias_for_own_team_deployment():
+    router = Router(
+        model_list=[
+            {
+                "model_name": "private-model",
+                "litellm_params": {"model": "openai/private-model"},
+                "model_info": {
+                    "team_id": "team-1",
+                    "team_public_model_name": "private-model",
+                },
+            }
+        ],
+        model_group_alias={"private-model[1m]": "private-model"},
+    )
+
+    assert set(router.get_model_names(team_id="team-1")) == {
+        "private-model",
+        "private-model[1m]",
+    }
+    assert router.get_model_names(team_id="team-2") == []
