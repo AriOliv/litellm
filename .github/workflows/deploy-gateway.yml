@@ -14,6 +14,7 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "docker/**"
+      - ".github/workflows/deploy-gateway.yml"
   workflow_dispatch:
 
 permissions: {}
