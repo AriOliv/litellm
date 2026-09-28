@@ -13,3 +13,9 @@ RUN target=/app/.venv/lib/python3.13/site-packages/litellm/proxy/utils.py && \
     grep -Fq 'get_model_names(team_id=team_id or user_api_key_dict.team_id)' "$target"
 
 COPY litellm/router.py /app/.venv/lib/python3.13/site-packages/litellm/router.py
+
+RUN anthropic=/app/.venv/lib/python3.13/site-packages/litellm/llms/anthropic && \
+    test -d "$anthropic/experimental_pass_through" && \
+    test ! -e "$anthropic/pass_through" && \
+    ln -s experimental_pass_through "$anthropic/pass_through" && \
+    python -c 'import litellm.llms.anthropic.pass_through.messages.handler'
