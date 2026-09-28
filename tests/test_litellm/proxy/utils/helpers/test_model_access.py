@@ -328,6 +328,30 @@ async def test_get_available_models_for_user_happy_path_returns_complete_list(
         "user_id": "user-1",
         "router_set": True,
     }
+    router.get_model_names.assert_called_once_with(team_id=None)
+
+
+@pytest.mark.asyncio
+async def test_get_available_models_for_user_lists_own_team_models(monkeypatch):
+    team_id = "team-admin"
+    router = _router_with_models(["global-model", "private-model"])
+    user_api_key_dict = UserAPIKeyAuth(
+        api_key="sk-test-key",
+        user_id="user-1",
+        team_id=team_id,
+        models=["all-team-models"],
+        team_models=["all-proxy-models"],
+    )
+
+    result = await get_available_models_for_user(
+        user_api_key_dict=user_api_key_dict,
+        llm_router=router,
+        general_settings={},
+        user_model=None,
+    )
+
+    router.get_model_names.assert_called_once_with(team_id=team_id)
+    assert set(result) == {"global-model", "private-model"}
 
 
 @pytest.mark.asyncio
