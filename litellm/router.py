@@ -11585,7 +11585,8 @@ class Router:
             if self._is_team_specific_model(model_info):
                 team_model_name = self._get_team_specific_model(deployment=deployment, team_id=team_id)
                 if team_model_name:
-                    model_names.append(team_model_name)
+                    listed_name: Final = deployment.get("model_name", "")
+                    model_names.append(listed_name if listed_name in self.model_group_alias else team_model_name)
             else:
                 model_names.append(deployment.get("model_name", ""))
 
