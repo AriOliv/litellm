@@ -95,7 +95,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
 
       - name: Get GKE credentials
-        uses: google-github-actions/get-gke-credentials@3da1e46c5fdcb9bb56e5f7c6650ed23f7edce1e4 # v2
+        uses: google-github-actions/get-gke-credentials@3da1e46a907576cefaa90c484278bb5b259dd395 # v3.0.0
         with:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GKE_LOCATION }}
