@@ -35,6 +35,7 @@ model_list:
       api_version: os.environ/AZURE_API_VERSION
     model_info:
       team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      team_public_model_name: gpt-6
       input_cost_per_token: 0.00001    # $10 / 1M (GPT-6 Astra; OpenAI list, Azure Global Standard)
       output_cost_per_token: 0.00005   # $50 / 1M
       cache_read_input_token_cost: 0.000001  # $1 / 1M
@@ -47,6 +48,7 @@ model_list:
       api_version: os.environ/AZURE_API_VERSION
     model_info:
       team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      team_public_model_name: gpt-6-sol
 
   - model_name: gpt-6-luna
     litellm_params:
@@ -69,6 +71,7 @@ model_list:
       api_version: os.environ/AZURE_API_VERSION
     model_info:
       team_id: 3d19f6a4-142b-4919-80d7-67e66aa0469f
+      team_public_model_name: gpt-5.6-sol
       input_cost_per_token: 0.000005
       output_cost_per_token: 0.00003
 
@@ -611,6 +614,8 @@ router_settings:
     "claude-g.p.t-6-sol[1m]": "gpt-6-sol"
     "claude-g.p.t-6-luna[1m]": "gpt-6-luna"
     "claude-g.p.t-5.6-sol[1m]": "gpt-5.6-sol"
+    "claude-g.p.t-5.6-terra[1m]": "gpt-5.6-terra"
+    "claude-g.p.t-5.6-luna[1m]": "gpt-5.6-luna"
     "claude-sonnet-5[1m]": "claude-sonnet-5"
   fallbacks:
     - {"claude-opus-4-7": ["glm-5.1"]}
