@@ -38,6 +38,7 @@ Usage:
     security_review_with_llm.py --repo owner/repo --pr 1234 --print-prompt
 """
 
+# ruff: noqa: T201  # CLI script: the printed review and verdict are the workflow output
 from __future__ import annotations
 
 import argparse
@@ -49,11 +50,12 @@ import re
 import subprocess
 import sys
 import urllib.parse
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
@@ -653,7 +655,7 @@ def build_sarif(outcome: ReviewOutcome, *, proposer_model: str, verifier_model: 
 
 
 def _fingerprint(finding: RawFinding) -> str:
-    basis = f"{finding.file}|{finding.category}|{finding.description}".encode("utf-8")
+    basis = f"{finding.file}|{finding.category}|{finding.description}".encode()
     return hashlib.sha256(basis).hexdigest()
 
 
