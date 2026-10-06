@@ -1,0 +1,107 @@
+name: Upstream sync
+
+# Rebuild the fork from upstream instead of merging thousands of unrelated
+# upstream UI commits into long-lived fork history.
+
+on:
+  schedule:
+    - cron: "17 13 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REMOTE: https://github.com/BerriAI/litellm.git
+  UPSTREAM_BRANCH: main
+
+jobs:
+  sync:
+    if: github.repository == 'AriOliv/litellm'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch upstream
+        run: |
+          set -euo pipefail
+          git remote add upstream "$UPSTREAM_REMOTE"
+          git fetch --no-tags upstream "$UPSTREAM_BRANCH"
+
+      - name: Rebuild sync branch from upstream
+        id: sync
+        run: |
+          set -euo pipefail
+          branch="litellm_hotfix_upstream_sync_$(date -u +%Y_%m_%d)"
+          fork_version="$(grep -m1 -E '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          upstream_version="$(git show upstream/${UPSTREAM_BRANCH}:pyproject.toml | grep -m1 -E '^version' | sed -E 's/.*"([^"]+)".*/\1/')"
+          behind="$(git rev-list --count HEAD..upstream/${UPSTREAM_BRANCH})"
+
+          git diff --binary upstream/${UPSTREAM_BRANCH}...HEAD -- \
+            .claude/skills/litellm-fork-upgrade \
+            .github/scripts/security_review_with_llm.py \
+            .github/scripts/triage-requirements.txt \
+            .github/workflows/deploy-gateway.yml \
+            .github/workflows/security_review_llm.yml \
+            .github/workflows/upstream_sync.yml \
+            .gitignore \
+            tests/test_litellm/test_github_security_review_with_llm.py \
+            > /tmp/fork.patch
+
+          git checkout -B "$branch" "upstream/${UPSTREAM_BRANCH}"
+          git apply --3way --index /tmp/fork.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(sync): upstream BerriAI/litellm -> fork (${upstream_version})"
+
+          {
+            echo "branch=${branch}"
+            echo "behind=${behind}"
+            echo "fork_version=${fork_version}"
+            echo "upstream_version=${upstream_version}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Push branch and open or refresh PR
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          BRANCH: ${{ steps.sync.outputs.branch }}
+          BEHIND: ${{ steps.sync.outputs.behind }}
+          FORK_VERSION: ${{ steps.sync.outputs.fork_version }}
+          UPSTREAM_VERSION: ${{ steps.sync.outputs.upstream_version }}
+        run: |
+          set -euo pipefail
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${BRANCH}"
+
+          body="$(cat <<EOF
+          Rebuilds the fork from upstream BerriAI/litellm and reapplies the curated operational patch.
+
+          - behind by ${BEHIND} commits
+          - version \`${FORK_VERSION}\` -> \`${UPSTREAM_VERSION}\`
+          - upstream UI and core code are retained
+          - fork skills, deploy and security automation are reapplied
+
+          Fork code patches under litellm/ are not carried by this job, including the premium_user flag.
+          Cherry-pick them per the litellm-fork-upgrade skill before deploying, or SSO and LiteAdmin break.
+          EOF
+          )"
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "chore(sync): upstream BerriAI/litellm -> fork (${UPSTREAM_VERSION})" \
+              --body "$body"
+          fi

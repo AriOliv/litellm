@@ -6,7 +6,8 @@ tests/e2e/.fixtures/
 .venv-mutmut
 mutants/
 .env
-.claude
+.claude/*
+!.claude/skills/
 CLAUDE.local.md
 .newenv
 newenv/*
