@@ -8667,12 +8667,14 @@ async def get_available_models_for_user(
         get_team_models,
     )
 
+    effective_team_id: Final = team_id or user_api_key_dict.team_id
+
     # Get proxy model list and access groups
     if llm_router is None:
         proxy_model_list = []
         model_access_groups = {}
     else:
-        proxy_model_list = llm_router.get_model_names()
+        proxy_model_list = llm_router.get_model_names(team_id=effective_team_id)
         model_access_groups = llm_router.get_model_access_groups()
 
     requested_team_object: Final = (
@@ -8706,8 +8708,6 @@ async def get_available_models_for_user(
         model_access_groups=model_access_groups,
         include_model_access_groups=include_model_access_groups,
     )
-
-    effective_team_id: Final = team_id or user_api_key_dict.team_id
 
     access_group_models: Final = (
         await _get_access_group_models(
