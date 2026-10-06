@@ -48,3 +48,25 @@ def test_map_team_model_should_not_iterate_aliases_for_non_alias_team_model_name
     # so the router can find all sibling deployments via team_id filtering
     result = router.map_team_model(team_model_name="team-model", team_id="team-1")
     assert result == "team-model", f"Expected public name 'team-model', got {result}"
+
+
+def test_model_alias_resolves_own_team_deployment():
+    router = Router(
+        model_list=[
+            {
+                "model_name": "private-model",
+                "litellm_params": {"model": "openai/private-model"},
+                "model_info": {
+                    "team_id": "team-1",
+                    "team_public_model_name": "private-model",
+                },
+            }
+        ],
+        model_group_alias={"private-model[1m]": "private-model"},
+    )
+
+    own_models = router.get_model_list(model_name="private-model[1m]", team_id="team-1")
+    other_models = router.get_model_list(model_name="private-model[1m]", team_id="team-2")
+
+    assert own_models and own_models[0]["model_name"] == "private-model[1m]"
+    assert other_models == []

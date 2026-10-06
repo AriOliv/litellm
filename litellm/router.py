@@ -12201,7 +12201,9 @@ class Router:
         """
         return bool(model_info and model_info.get("team_id"))
 
-    def get_model_list_from_model_alias(self, model_name: str | None = None) -> list[DeploymentTypedDict]:
+    def get_model_list_from_model_alias(
+        self, model_name: str | None = None, team_id: str | None = None
+    ) -> list[DeploymentTypedDict]:
         """
         Helper function to get model list from model alias.
 
@@ -12234,7 +12236,11 @@ class Router:
                 )
             else:
                 returned_models.extend(
-                    self._get_all_deployments(model_name=_router_model_name, model_alias=model_alias)
+                    self._get_all_deployments(
+                        model_name=_router_model_name,
+                        model_alias=model_alias,
+                        team_id=team_id,
+                    )
                 )
 
         return returned_models
@@ -12406,7 +12412,7 @@ class Router:
         if model_name is not None:
             returned_models.extend(self._get_all_deployments(model_name=model_name, team_id=team_id))
 
-        returned_models.extend(self.get_model_list_from_model_alias(model_name=model_name))
+        returned_models.extend(self.get_model_list_from_model_alias(model_name=model_name, team_id=team_id))
         returned_models.extend(self.get_model_list_from_routing_groups(model_name=model_name))
 
         if len(returned_models) == 0:  # check if wildcard route
