@@ -18,7 +18,9 @@ FROM $LITELLM_BUILD_IMAGE AS pgbouncer-builder
 ARG PGBOUNCER_VERSION
 ARG PGBOUNCER_SHA256
 USER root
-RUN apk add --no-cache build-base pkgconf libevent-dev openssl-dev curl
+# TODO: drop the 'openssl-dev<4' pin once pgbouncer's lib/usual/tls/tls_compat.c builds against OpenSSL 4,
+# which made ASN1_TIME opaque. Wolfi's openssl-4.0-dev provides openssl-dev, so the unpinned name resolves to 4.x.
+RUN apk add --no-cache build-base pkgconf libevent-dev 'openssl-dev<4' curl
 WORKDIR /build
 RUN curl -fsSL -o pgbouncer.tar.gz "https://www.pgbouncer.org/downloads/files/${PGBOUNCER_VERSION}/pgbouncer-${PGBOUNCER_VERSION}.tar.gz" && \
     echo "${PGBOUNCER_SHA256}  pgbouncer.tar.gz" | sha256sum -c - && \
